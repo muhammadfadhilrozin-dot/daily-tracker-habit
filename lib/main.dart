@@ -7,6 +7,9 @@ import 'services/notification_service.dart';
 import 'screens/add_edit_habit_screen.dart';
 
 final themeService = ThemeService();
+final habitRefreshNotifier = ValueNotifier<int>(
+  0,
+); // naik setiap ada perubahan habit
 const String kUserName = 'Rozin';
 
 class AppColors {
@@ -135,7 +138,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+        padding: const EdgeInsets.fromLTRB(32, 10, 32, 14),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
           border: Border(
@@ -145,10 +148,12 @@ class _HomePageState extends State<HomePage> {
         child: SafeArea(
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Dashboard
-              _navItem(index: 0, icon: Icons.home_rounded, label: 'Dashboard'),
-              // Tambah Habit (tengah)
+              // ikon Dashboard
+              _navIcon(index: 0, icon: Icons.home_rounded),
+
+              // tombol + tengah
               GestureDetector(
                 onTap: () async {
                   await Navigator.push(
@@ -160,8 +165,8 @@ class _HomePageState extends State<HomePage> {
                   setState(() {});
                 },
                 child: Container(
-                  width: 54,
-                  height: 54,
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
                     color: AppColors.primary,
                     shape: BoxShape.circle,
@@ -177,8 +182,9 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ),
-              // Habits
-              _navItem(index: 1, icon: Icons.task_alt_rounded, label: 'Habits'),
+
+              // ikon Habits
+              _navIcon(index: 1, icon: Icons.task_alt_rounded),
             ],
           ),
         ),
@@ -186,48 +192,28 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _navItem({
-    required int index,
-    required IconData icon,
-    required String label,
-  }) {
+  Widget _navIcon({required int index, required IconData icon}) {
     final isSelected = _currentIndex == index;
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: isSelected
-            ? const EdgeInsets.symmetric(horizontal: 16, vertical: 8)
-            : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        width: 46,
+        height: 46,
         decoration: isSelected
             ? BoxDecoration(
                 color: AppColors.green,
-                borderRadius: BorderRadius.circular(30),
+                shape: BoxShape.circle,
                 border: Border.all(color: AppColors.black, width: 2),
                 boxShadow: const [
                   BoxShadow(color: AppColors.black, offset: Offset(2, 2)),
                 ],
               )
             : null,
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 22,
-              color: isSelected ? AppColors.black : Colors.grey,
-            ),
-            if (isSelected) ...[
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.black,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ],
+        child: Icon(
+          icon,
+          size: 24,
+          color: isSelected ? AppColors.black : Colors.grey.shade500,
         ),
       ),
     );

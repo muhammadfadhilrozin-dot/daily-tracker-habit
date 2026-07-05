@@ -30,6 +30,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _loadData();
+    // Dengarkan perubahan dari HabitListScreen — reload otomatis kalau ada habit dicentang
+    habitRefreshNotifier.addListener(_loadData);
+  }
+
+  @override
+  void dispose() {
+    habitRefreshNotifier.removeListener(_loadData);
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -219,7 +227,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               border: Border.all(color: AppColors.black, width: 2),
             ),
             child: const Icon(
-              Icons.self_improvement_rounded,
+              Icons.task_alt_rounded,
               color: Colors.white,
               size: 48,
             ),
@@ -636,6 +644,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       _dbHelper.todayKey,
                       !isCompleted,
                     );
+                    habitRefreshNotifier.value++; // refresh Dashboard juga
                     _loadData();
                   },
                   child: AnimatedContainer(

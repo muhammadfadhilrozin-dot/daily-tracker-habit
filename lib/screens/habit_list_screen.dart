@@ -53,6 +53,7 @@ class _HabitListScreenState extends State<HabitListScreen> {
       _dbHelper.todayKey,
       !current,
     );
+    habitRefreshNotifier.value++; // beritahu Dashboard untuk reload
     _loadHabits();
   }
 
@@ -114,15 +115,24 @@ class _HabitListScreenState extends State<HabitListScreen> {
               elevation: 0,
               title: Row(
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.salmon,
-                      border: Border.all(color: AppColors.black, width: 2),
+                  GestureDetector(
+                    onTap: () =>
+                        themeService.toggleTheme(!themeService.isDarkMode),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.salmon,
+                        border: Border.all(color: AppColors.black, width: 2),
+                      ),
+                      child: Icon(
+                        themeService.isDarkMode
+                            ? Icons.light_mode_rounded
+                            : Icons.dark_mode_rounded,
+                        size: 18,
+                      ),
                     ),
-                    child: const Icon(Icons.person_rounded, size: 18),
                   ),
                   const SizedBox(width: 10),
                   const Text(
@@ -133,8 +143,23 @@ class _HabitListScreenState extends State<HabitListScreen> {
               ),
               actions: [
                 GestureDetector(
-                  onTap: () =>
-                      themeService.toggleTheme(!themeService.isDarkMode),
+                  onTap: () {
+                    // Tombol lonceng: tampilkan info reminder yang aktif
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          _habits.where((h) => h.hasReminder).isEmpty
+                              ? 'Belum ada reminder yang diatur'
+                              : 'Reminder aktif: ${_habits.where((h) => h.hasReminder).map((h) => "${h.name} (${h.reminderLabel})").join(", ")}',
+                        ),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  },
                   child: Container(
                     margin: const EdgeInsets.only(right: 16),
                     width: 40,
@@ -188,6 +213,7 @@ class _HabitListScreenState extends State<HabitListScreen> {
       title = 'Ayo Semangat!';
 
     return Container(
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.green,
         borderRadius: BorderRadius.circular(22),
@@ -196,63 +222,35 @@ class _HabitListScreenState extends State<HabitListScreen> {
           BoxShadow(color: AppColors.black, offset: Offset(4, 4)),
         ],
       ),
-      clipBehavior: Clip.hardEdge,
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'STATISTIK HARI INI',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 11,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 22,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.black,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Text(
-                      '$done/$total Tugas',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          const Text(
+            'STATISTIK HARI INI',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 11,
+              letterSpacing: 1.2,
             ),
           ),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24),
+          ),
+          const SizedBox(height: 14),
           Container(
-            width: 110,
-            height: 130,
-            color: AppColors.darkCard,
-            child: const Center(
-              child: Icon(
-                Icons.self_improvement_rounded,
-                size: 70,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.black,
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Text(
+              '$done/$total Tugas',
+              style: const TextStyle(
                 color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
               ),
             ),
           ),
@@ -269,88 +267,114 @@ class _HabitListScreenState extends State<HabitListScreen> {
 
     return SizedBox(
       height: 72,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: 7,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final date = monday.add(Duration(days: i));
-          final isToday =
-              date.year == today.year &&
-              date.month == today.month &&
-              date.day == today.day;
-          final isPast = date.isBefore(
-            DateTime(today.year, today.month, today.day),
-          );
-          // Anggap hari lampau selesai kalau ada log selesai (simplified — pakai isToday check)
-          final isDoneDay =
-              isPast; // semua hari sebelumnya dianggap "sudah dilewati"
+      child: FutureBuilder<List<bool>>(
+        future: _loadDayCompletions(monday),
+        builder: (context, snap) {
+          final completions = snap.data ?? List.filled(7, false);
+          return ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: 7,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, i) {
+              final date = monday.add(Duration(days: i));
+              final isToday =
+                  date.year == today.year &&
+                  date.month == today.month &&
+                  date.day == today.day;
+              final isPast = date.isBefore(
+                DateTime(today.year, today.month, today.day),
+              );
+              final isDone =
+                  completions[i]; // centang hanya kalau benar-benar ada yang selesai
 
-          return Container(
-            width: 58,
-            decoration: BoxDecoration(
-              color: isToday ? AppColors.black : Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isToday
-                    ? AppColors.black
-                    : AppColors.black.withOpacity(0.25),
-                width: 2,
-              ),
-              boxShadow: isToday
-                  ? const [
-                      BoxShadow(color: AppColors.black, offset: Offset(2, 2)),
-                    ]
-                  : null,
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+              return Container(
+                width: 58,
+                decoration: BoxDecoration(
+                  color: isToday ? AppColors.black : Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isToday
+                        ? AppColors.black
+                        : AppColors.black.withOpacity(0.2),
+                    width: 2,
+                  ),
+                  boxShadow: isToday
+                      ? const [
+                          BoxShadow(
+                            color: AppColors.black,
+                            offset: Offset(2, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    Text(
-                      labels[i],
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: isToday ? Colors.white : Colors.grey.shade500,
+                    // Teks hari & tanggal (muncul kalau hari ini atau belum ada centang)
+                    if (!isDone || isToday)
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            labels[i],
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: isToday
+                                  ? Colors.white
+                                  : Colors.grey.shade500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${date.day}',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: isToday ? Colors.white : AppColors.black,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    if (!isDoneDay)
-                      Text(
-                        '${date.day}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: isToday ? Colors.white : AppColors.black,
+                    // Centang hijau — hanya hari lewat yang benar-benar ada habit selesai
+                    if (isDone && isPast)
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: AppColors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.black,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.check_rounded,
+                          size: 16,
+                          color: AppColors.black,
                         ),
                       ),
                   ],
                 ),
-                // Centang hijau untuk hari yang sudah lewat
-                if (isDoneDay)
-                  Container(
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      color: AppColors.green,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.black, width: 1.5),
-                    ),
-                    child: const Icon(
-                      Icons.check_rounded,
-                      size: 16,
-                      color: AppColors.black,
-                    ),
-                  ),
-              ],
-            ),
+              );
+            },
           );
         },
       ),
     );
+  }
+
+  /// Cek tiap hari dalam seminggu ini: apakah ada minimal 1 habit yang selesai?
+  Future<List<bool>> _loadDayCompletions(DateTime monday) async {
+    final result = <bool>[];
+    for (int i = 0; i < 7; i++) {
+      final date = monday.add(Duration(days: i));
+      final key = DateFormat('yyyy-MM-dd').format(date);
+      final logs = await _dbHelper.getLogsForDate(key);
+      result.add(logs.any((l) => l.isCompleted));
+    }
+    return result;
   }
 
   // ─── Habit Grid ────────────────────────────────────────────────
@@ -681,14 +705,9 @@ class _DashedBorderPainter extends CustomPainter {
 
     for (final metric in metrics) {
       double distance = 0;
-
       while (distance < metric.length) {
-        final double len = (distance + dashWidth)
-            .clamp(0.0, metric.length)
-            .toDouble();
-
+        final double len = (distance + dashWidth).clamp(0.0, metric.length);
         canvas.drawPath(metric.extractPath(distance, len), paint);
-
         distance += dashWidth + dashSpace;
       }
     }
